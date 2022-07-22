@@ -1,0 +1,7 @@
+benepar
+pandas
+numpy
+seaborn
+matplotlib
+pickle
+PyPDF2
