@@ -7,7 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/17uF0F6_x6SL_Gio0xEkgqlzFQuuhqzlV
 """
 
-import spacy 
+# import spacy 
 import PyPDF2
 import pandas as pd
 import numpy as np
@@ -124,7 +124,7 @@ class preprocess:
       sorted_list = sorted(sentence_vocab, key = lambda word: cos_dis(sentence_emb_features[sentence_vocab.index(value),:],sentence_emb_features[sentence_vocab.index(word),:]),reverse=True)
       return sorted_list[:5]
 
-  def tfidfvectorizer(self,corpus,):
+  def tfidfvectorizer(self,corpus):
       """
       This function creates vocabulary of simple words based on 
       a set of corporas coming from Falc and simplified versions of 
@@ -261,8 +261,9 @@ class recognition:
                 # if cos_sim_avg > margin:
                 result.append((word,cos_sim_avg,round(float(self.lexique[self.lexique.index.isin([word])]['freqfilms2'].values),2)))
           print()
+          result = sorted(result, key = lambda x:x[1], reverse = False)[:1]
           self.token_to_complex.append({'sentence_tokens':''.join(sentence),'complex_words':result},reverse=True)
-          return sorted(result, key = lambda x:x[1], reverse = False)[:1] , self.token_to_complex
+          return  result, self.token_to_complex
           
           
       # except TypeError:
