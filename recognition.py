@@ -154,6 +154,8 @@ class preprocess:
       input: None
       output: list of tokens associated to each sentence
       """
+      ##To-DO: Make sure to add a method through which anyone 
+      ## entering an input different a list 
       try:
         count=1
         for text in texts:
@@ -173,15 +175,17 @@ class preprocess:
       except TypeError:
         print('Your data shoud be found inside a list')
 
+      return self.sentence_token
+
 class recognition:
 
-   def __init__(self):
+   def __init__(self,path_model):
       # self.tokenized_sentences = tokenized_sentences
       # self.model = model_path
       self.token_to_complex = list()
       self.sentence_verbs = list()
-      # self.model = Word2Vec(all_words, vector_size=100, window=5, min_count=1)
-      # self.model.save('word2vec.model')
+      self.model = Word2Vec()
+      self.model.load(path_model)
       # self.nlp = spacy.load('fr_core_news_sm')
       self.lexique = pd.read_table('http://www.lexique.org/databases/Lexique383/Lexique383.tsv')
       self.lexique = self.lexique.groupby('ortho').sum()
