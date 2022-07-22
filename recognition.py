@@ -179,13 +179,14 @@ class preprocess:
 
 class recognition:
 
-   def __init__(self,path_model):
+   def __init__(self):
       # self.tokenized_sentences = tokenized_sentences
       # self.model = model_path
       self.token_to_complex = list()
       self.sentence_verbs = list()
-      self.model = Word2Vec()
-      self.model.load(path_model)
+      self.model = 0
+      # self.model = Word2Vec(all_words, vector_size=100, window=5, min_count=1)
+      # self.model.save(path_model)
       # self.nlp = spacy.load('fr_core_news_sm')
       self.lexique = pd.read_table('http://www.lexique.org/databases/Lexique383/Lexique383.tsv')
       self.lexique = self.lexique.groupby('ortho').sum()
@@ -202,7 +203,7 @@ class recognition:
       #   self.nlp.add_pipe("benepar", config={"model": "benepar_fr2"})
 
 
-   def complex_word_recognition(self,sentence_list,margin=0.2):
+   def complex_word_recognition(self,sentence_list,path_model,margin=0.2):
       """
       This function permits the extraction of complex words in 
       a sentence with the use of a classification model.
@@ -255,7 +256,7 @@ class recognition:
           for word in sentence:
               if word not in self.model.wv.index_to_key and count !=2 or count>2:
                 print('word not in vocab',word)
-                self.model = Word2Vec.load("word2vec.model")
+                self.model = Word2Vec.load(path_model)
                 self.model.train([[sentence]], total_examples=1, epochs=1)
                 count+=1
               else:
