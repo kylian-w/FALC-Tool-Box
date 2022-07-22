@@ -41,7 +41,7 @@ class preprocess:
   input: text
   """
   def __init__(self):
-      self.nlp = spacy.load('fr_core_news_sm')  ## download french model
+      # self.nlp = spacy.load('fr_core_news_sm')  ## download french model
       self.sentence_token = list()
       self.texts= list()
       self.word_token = TreebankWordTokenizer()
