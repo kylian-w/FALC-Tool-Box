@@ -175,7 +175,7 @@ class preprocess:
 
 class recognition:
 
-   def __init__(self,all_words):
+   def __init__(self):
       # self.tokenized_sentences = tokenized_sentences
       # self.model = model_path
       self.token_to_complex = list()
