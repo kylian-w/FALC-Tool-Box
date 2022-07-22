@@ -180,8 +180,8 @@ class recognition:
       # self.model = model_path
       self.token_to_complex = list()
       self.sentence_verbs = list()
-      self.model = Word2Vec(all_words, vector_size=100, window=5, min_count=1)
-      self.model.save('word2vec.model')
+      # self.model = Word2Vec(all_words, vector_size=100, window=5, min_count=1)
+      # self.model.save('word2vec.model')
       # self.nlp = spacy.load('fr_core_news_sm')
       self.lexique = pd.read_table('http://www.lexique.org/databases/Lexique383/Lexique383.tsv')
       self.lexique = self.lexique.groupby('ortho').sum()
