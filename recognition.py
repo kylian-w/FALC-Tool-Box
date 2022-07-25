@@ -119,7 +119,7 @@ class preprocess:
       output: list of tokens associated to each sentence
       """
       if type(texts) == str:
-        print('Your input value should be in a form of a list')
+        print('ProcessErrro: Your input value should be in a form of a list try again')
       
       else: 
         try:
@@ -154,7 +154,7 @@ class recognition:
       self.lexique = self.lexique.groupby('ortho').sum()
 
 
-   def complex_word_recognition(self,sentence_list,path_model,margin=0.2):
+   def complex_word_recognition(self,sentence_list,path_model,margin=0.15):
       """
       This function permits the extraction of complex words in 
       a sentence with the use of a classification model.
@@ -162,27 +162,34 @@ class recognition:
       input: tokenized set of sentences
       output: tokenized sentences with their associated complex words
       """
-      result = []
-      count = 0
-      self.model = Word2Vec.load(path_model)
-      for sentence in sentence_list:
-          for word in sentence:
-            if word not in self.model.wv.index_to_key:
-              continue
-              # if word not in self.model.wv.index_to_key and count !=2 or count>2:
-              #   print('word not in vocab',word)
-              #   # self.model = Word2Vec.load(path_model)
-              #   self.model.train([[sentence]], total_examples=1, epochs=1)
-              #   count+=1
-            else:
-                cos_sim_avg = np.average(self.model.wv.cosine_similarities(self.model.wv[word],self.model.wv[self.model.wv.index_to_key]))
+      if type(sentence_list[0]) == str:
+        print('TypeError:Your input value should be in a form of a list try again') ##Check data validity
+      else:
+        result = []
+        not_found = []
+        self.model = Word2Vec.load(path_model)
+        for sentence in sentence_list:
+            for word in sentence:
+                if word not in self.model.wv.index_to_key:
+                  not_found.append(word)
+            print('words not found ',not_found)
+            if len(not_found) !=0:
+              self.model.build_vocab([not_found], update=True)
+              self.model.train([not_found],total_examples=self.model.corpus_count, epochs=self.model.epochs)
+            for word in sentence:
+                  cos_sim_avg = np.average(self.model.wv.cosine_similarities(self.model.wv[word],self.model.wv[self.model.wv.index_to_key]))
 
-                # if cos_sim_avg > margin:
-                result.append((word,cos_sim_avg,round(float(self.lexique[self.lexique.index.isin([word])]['freqfilms2'].values),2)))
-          print()
-          result = sorted(result, key = lambda x:x[1], reverse = False)[:1]
-          self.token_to_complex.append({'sentence_tokens':''.join(sentence),'complex_words':result},reverse=True)
-          return  result, self.token_to_complex
+                  if cos_sim_avg > margin:
+                    result.append((word,cos_sim_avg,round(float(self.lexique[self.lexique.index.isin([word])]['freqfilms2'].values),2),self.lexique[self.lexique.index.isin([word])]['old20'].values))
+            print()
+            result = sorted(result, key = lambda x:x[1], reverse = True)[:1]
+            if len(result) !=0:
+              print('Complex word(s) found')
+              self.token_to_complex.append({'sentence':' '.join(sentence),'complex_words':result[0][0]})
+              return self.token_to_complex[-1]
+            else:
+              print('No complex word found')
+              return ' '.join(sentence)
         
 
 
