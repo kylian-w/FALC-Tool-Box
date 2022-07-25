@@ -154,7 +154,7 @@ class recognition:
       self.lexique = self.lexique.groupby('ortho').sum()
 
 
-   def complex_word_recognition(self,sentence_list,path_model,margin=0.15):
+   def complex_word_recognition(self,sentence_list,path_model,margin=0.10):
       """
       This function permits the extraction of complex words in 
       a sentence with the use of a classification model.
@@ -172,7 +172,6 @@ class recognition:
             for word in sentence:
                 if word not in self.model.wv.index_to_key:
                   not_found.append(word)
-            print('words not found ',not_found)
             if len(not_found) !=0:
               self.model.build_vocab([not_found], update=True)
               self.model.train([not_found],total_examples=self.model.corpus_count, epochs=self.model.epochs)
@@ -186,11 +185,12 @@ class recognition:
             if len(result) !=0:
               print('Complex word(s) found')
               self.token_to_complex.append({'sentence':' '.join(sentence),'complex_words':result[0][0]})
-              return self.token_to_complex[-1]
+              
             else:
               print('No complex word found')
-              return ' '.join(sentence)
-        
+              self.token_to_complex.append({'sentence':' '.join(sentence)})
+
+      return self.token_to_complex  
 
 
    def tense_recognition(self):
