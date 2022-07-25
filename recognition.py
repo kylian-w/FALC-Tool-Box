@@ -167,12 +167,14 @@ class recognition:
       self.model = Word2Vec.load(path_model)
       for sentence in sentence_list:
           for word in sentence:
+            if word not in self.model.wv.index_to_key:
+              continue
               # if word not in self.model.wv.index_to_key and count !=2 or count>2:
               #   print('word not in vocab',word)
               #   # self.model = Word2Vec.load(path_model)
               #   self.model.train([[sentence]], total_examples=1, epochs=1)
               #   count+=1
-              # else:
+            else:
                 cos_sim_avg = np.average(self.model.wv.cosine_similarities(self.model.wv[word],self.model.wv[self.model.wv.index_to_key]))
 
                 # if cos_sim_avg > margin:
