@@ -118,25 +118,30 @@ class preprocess:
       input: Corpus
       output: list of tokens associated to each sentence
       """
-      assert isinstance(texts[0], list()), f'Your token list should be in a list {texts[0]}'
-      try:
-        count=1
-        for text in texts:
-          sentences = self.clean_text(text) ##Parser
-          ##Lexical analyser and symmbol table creation per sentence
-          for sentence in sentences:
-            tokens = self.word_token.tokenize(sentence)
-            tokens = [token for token in tokens if token != '\n'] ##Regular expression could also solve the problem
-            tokens = [token for token in tokens if token.isalpha()] ##Removing numerical data
-            if '\n ' in tokens:
-                tokens.remove('\n ') ##Remove empty space symbols
-            if len(tokens) != 0:
-              self.sentence_token.append(tokens)
-          count+=1 ##Count the number of available text
-      except TypeError:
-        print('Your data shoud be found inside a list')
-
-      return self.sentence_token
+      if type(texts) == str:
+        print('Your input value should be in a form of a list')
+      
+      else: 
+        try:
+          count=1
+          for text in texts:
+            sentences = self.clean_text(text) ##Parser
+            # print(f'The length of cleaned text {count} is {len(new_text)}, that of the original text {count} is {len(text)} and their ratio is {round(len(new_text)/len(text),2)}')
+            # print()##add some space
+            ##Lexical analyser and symmbol table creation per sentence
+            for sentence in sentences:
+              tokens = self.word_token.tokenize(sentence)
+              tokens = [token for token in tokens if token != '\n'] ##Regular expression could also solve the problem
+              tokens = [token for token in tokens if token.isalpha()] ##Removing numerical data
+              if '\n ' in tokens:
+                  tokens.remove('\n ') ##Remove empty space symbols
+              if len(tokens) != 0:
+                self.sentence_token.append(tokens)
+            count+=1 ##Count the number of available text
+        except TypeError:
+          print('Your data shoud be found inside a list')
+        
+        return self.sentence_token
 
 class recognition:
 
@@ -162,14 +167,13 @@ class recognition:
       self.model = Word2Vec.load(path_model)
       for sentence in sentence_list:
           for word in sentence:
-              if word not in self.model.wv.index_to_key and count !=2 or count>2:
-                print('word not in vocab',word)
-                # self.model = Word2Vec.load(path_model)
-                self.model.train([[sentence]], total_examples=1, epochs=1)
-                count+=1
-              else:
+              # if word not in self.model.wv.index_to_key and count !=2 or count>2:
+              #   print('word not in vocab',word)
+              #   # self.model = Word2Vec.load(path_model)
+              #   self.model.train([[sentence]], total_examples=1, epochs=1)
+              #   count+=1
+              # else:
                 cos_sim_avg = np.average(self.model.wv.cosine_similarities(self.model.wv[word],self.model.wv[self.model.wv.index_to_key]))
-                print((word,cos_sim_avg))
 
                 # if cos_sim_avg > margin:
                 result.append((word,cos_sim_avg,round(float(self.lexique[self.lexique.index.isin([word])]['freqfilms2'].values),2)))
