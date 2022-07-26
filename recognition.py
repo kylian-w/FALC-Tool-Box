@@ -184,11 +184,11 @@ class recognition:
             result = sorted(result, key = lambda x:x[1], reverse = True)[:1]
             if len(result) !=0:
               print('Complex word(s) found')
-              self.token_to_complex.append({'sentence':' '.join(sentence),'complex_words':result[0][0]})
+              self.token_to_complex.append([' '.join(sentence),result[0][0]])
               
             else:
               print('No complex word found')
-              self.token_to_complex.append({'sentence':' '.join(sentence)})
+              self.token_to_complex.append([' '.join(sentence)])
 
       return self.token_to_complex  
 
