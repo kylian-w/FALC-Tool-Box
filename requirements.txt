@@ -2,3 +2,11 @@ gensim
 benepar
 seaborn
 PyPDF2
+spacy
+os
+CamembertModel
+re
+PyDictionary
+nltk
+condacolab
+faiss
