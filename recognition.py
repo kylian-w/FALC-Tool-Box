@@ -150,8 +150,8 @@ class recognition:
       self.token_to_complex = list()
       self.sentence_verbs = list()
       self.model = 0
-      self.lexique = pd.read_table('http://www.lexique.org/databases/Lexique383/Lexique383.tsv')
-      self.lexique = self.lexique.groupby('ortho').sum()
+      # self.lexique = pd.read_table('http://www.lexique.org/databases/Lexique383/Lexique383.tsv')
+      # self.lexique = self.lexique.groupby('ortho').sum()
 
 
    def complex_word_recognition(self,sentence_list,path_model,margin=0.10):
@@ -179,7 +179,7 @@ class recognition:
                   cos_sim_avg = np.average(self.model.wv.cosine_similarities(self.model.wv[word],self.model.wv[self.model.wv.index_to_key]))
 
                   if cos_sim_avg > margin:
-                    result.append((word,cos_sim_avg,round(float(self.lexique[self.lexique.index.isin([word])]['freqfilms2'].values),2),self.lexique[self.lexique.index.isin([word])]['old20'].values))
+                      result.append((word,cos_sim_avg))
             print()
             result = sorted(result, key = lambda x:x[1], reverse = True)[:1]
             if len(result) !=0:
