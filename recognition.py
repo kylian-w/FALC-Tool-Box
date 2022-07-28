@@ -15,6 +15,8 @@ import seaborn as sb
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
+import nltk
+nltk.download('punkt')
 from nltk.tokenize import word_tokenize
 from nltk.tokenize import sent_tokenize
 from nltk.tokenize import TreebankWordTokenizer
@@ -34,6 +36,7 @@ class preprocess:
   def __init__(self):
       self.sentence_token = list()
       self.texts= list()
+      self.total_token = 0
 
   def extract_text_pdf(self,pdf_directory):
       """
@@ -47,11 +50,12 @@ class preprocess:
       pdf =  open(pdf_directory,'rb')
       pdf = PyPDF2.PdfFileReader(pdf)
       texts= list()
-      print(f'A total of {pdf.numPages} page(s) was identified in the PDF')
       for i in range(pdf.numPages):
         pagepdf = pdf.getPage(i)
         self.texts.append(self.lower_text(pagepdf.extractText()))
       
+      print(f'In document {pdf_directory} a total of {pdf.numPages} page(s) was identified in the PDF and  {self.total_token} token(s) processed.')
+      print()
       return self.preprocess_text(self.texts)
 
   def lower_text(self,text):
@@ -86,6 +90,15 @@ class preprocess:
         """
       return self.get_sentences(text)
 
+  def bind_num(self,matchobj):
+      """
+      Function to bind French numerical numbers
+
+      input: regular expression object
+      output: binded numerical number 
+      """
+      return ''.join(matchobj.group(0).split(' '))
+
   def preprocess_text(self,texts):
       """
       This function entails further preprocessing operations
@@ -106,16 +119,17 @@ class preprocess:
             sentences = self.clean_text(text) ##Parser
             ##Lexical analyser and symmbol table creation per sentence
             for sentence in sentences:
-              sentence = re.sub(",", ' ', sentence)
-              sentence = re.sub("[0-9]+\s*.[0-9]+\s*.[0]+", self.dashrepl, sentence)
-              sentence = re.sub(r"http\S+", "", sentence)
-              sentence = re.sub("[A-Za-z0-9]*@[A-Za-z0-9]*.[A-Za-z]*", '', sentence)
+              sentence = re.sub(",", ' ', sentence) ## replace special character by empty space
+              sentence = re.sub("[0-9]+\s*.[0-9]+\s*.[0]+", self.bind_num, sentence) ##Capture french numerical numbers
+              sentence = re.sub(r"http\S+", "", sentence) ## Replace http links by empty space
+              sentence = re.sub("[A-Za-z0-9]*@[A-Za-z0-9]*.[A-Za-z]*", '', sentence) ## Replace email addresses by empty space
               tokens = word_tokenize(sentence, language='french')
-              tokens = [re.sub("[a-z]+[',’,']",'', token) for token in tokens] 
-              tokens = [token for token in tokens if token != '\n'] ##Regular expression could also solve the problem
-              tokens = [token for token in tokens if token not in ['*','.',',','«','(',')','»',"l'",'-',';','[',']','—',':','…','?','–','...','!','’',"'",'•','/','➢','&','|','=']] 
-              tokens = [re.sub("[.,•]",'', token) for token in tokens]
-              
+              tokens = [re.sub("[a-z]+[',’,']",'', token) for token in tokens] #
+              tokens = [token for token in tokens if token != '\n'] ## Remove next line (\n) symbols
+              tokens = [token for token in tokens if token not in ['*','.',',','«','(',')','»',"l'",'-',';','[',']','—',':','…','?','–','...','!','’',"'",'•','/','➢','&','|','=']] ## remove special characters 
+              tokens = [re.sub("[.,•]",'', token) for token in tokens] ## replace special characters by empty space
+              self.total_token += len(tokens)
+
               if '\n ' in tokens:
                   tokens.remove('\n ') ##Remove empty space symbols
               if len(tokens) != 0:
