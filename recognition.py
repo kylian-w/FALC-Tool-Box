@@ -8,21 +8,19 @@ Original file is located at
 """
 ##TO-DO just keep what is needed in the imports
 import PyPDF2
+import re
 import pandas as pd
 import numpy as np
 import seaborn as sb
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
-import nltk
-nltk.download('punkt')
+from nltk.tokenize import word_tokenize
 from nltk.tokenize import sent_tokenize
-import re
 from nltk.tokenize import TreebankWordTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from numpy.linalg import svd
-from gensim.models import Word2Vec, Doc2Vec
-from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+from gensim.models import Word2Vec
 
 
 
@@ -32,14 +30,10 @@ class preprocess:
   """
   NLP preprocessing by Engineers at ISEP
 
-  input: text
   """
   def __init__(self):
       self.sentence_token = list()
       self.texts= list()
-      self.word_token = TreebankWordTokenizer()
-      self.tfidf = TfidfVectorizer()
-      self.simple_vocab = 0
 
   def extract_text_pdf(self,pdf_directory):
       """
@@ -47,7 +41,7 @@ class preprocess:
       processed list of the text.
 
       input: pdf direcotry
-      output: list of preprocessed text
+      output: list of preprocessed text that is tokenized sentences and their tokens
       """
       pdf_clean_text = list()
       pdf =  open(pdf_directory,'rb')
@@ -57,13 +51,29 @@ class preprocess:
       for i in range(pdf.numPages):
         pagepdf = pdf.getPage(i)
         self.texts.append(self.lower_text(pagepdf.extractText()))
-      self.preprocess_text(self.texts)
+      
+      return self.preprocess_text(self.texts)
 
   def lower_text(self,text):
+      """
+      removing spaces at the begining and end of string 
+      and puts the text into small letters.
+
+      input: text
+      output: small case text
+      """
       return  text.strip().lower()
 
   def get_sentences(self,text): 
-    return sent_tokenize(self.lower_text(text))    
+      """
+      Sentence tokenization or splitting function, breaks a bunch of 
+      text into a set of sentence based on the dot (.) punctuation
+      mark.
+
+      input: text
+      output: tokenized sentence
+      """
+      return sent_tokenize(self.lower_text(text),language='french')    
 
   def clean_text(self,text):
       """
@@ -72,41 +82,9 @@ class preprocess:
       preprocesing. This function takes no parameter.
 
       input: None
-      otput:splitted sentences based in part of speech tagging.
+      output:splitted sentences based in part of speech tagging.
         """
       return self.get_sentences(text)
-
-  def cosine_sim(self,u,v):
-      """
-      Cosine similarity function formulation
-      """
-      dist = 1.0 - np.dot(u, v) / (norm(u) * norm(v))
-      return dist
-  
-
-  def get_similarity(value, sentence_vocab, sentence_emb_features):
-      sorted_list = sorted(sentence_vocab, key = lambda word: cos_dis(sentence_emb_features[sentence_vocab.index(value),:],sentence_emb_features[sentence_vocab.index(word),:]),reverse=True)
-      return sorted_list[:5]
-
-  def tfidfvectorizer(self,corpus):
-      """
-      This function creates vocabulary of simple words based on 
-      a set of corporas coming from Falc and simplified versions of 
-      complex phrases.
-
-      input: corpus
-      output:corpus vocabulary, embedding retaining most of the information
-      """
-      tfidf_dim = self.tfidf.fit_transform(corpus)
-      names = tfidf.get_feature_names() #Get set of vocabulary values
-      cooccurencematrix = pd.DataFrame(data = tfidf_dim.toarray(), columns = names, index = names)
-      U,S,V = svd(df) ##Single value decompistion for feature extraction
-      emb_features = U[:,:20]
-
-      return tfidf.vocabulary_.keys(), emb_features
-
-
-
 
   def preprocess_text(self,texts):
       """
@@ -115,24 +93,29 @@ class preprocess:
       splitted sentence from text using spacy part of speech
       french tagging.
 
-      input: Corpus
+      input: text corpus
       output: list of tokens associated to each sentence
       """
-      if type(texts) == str:
-        print('ProcessErrro: Your input value should be in a form of a list try again')
+      if type(texts) == str: ## Make sure text is found in a list
+        print('ProcessError: Your input value should be in a form of a list try again')
       
       else: 
         try:
           count=1
           for text in texts:
             sentences = self.clean_text(text) ##Parser
-            # print(f'The length of cleaned text {count} is {len(new_text)}, that of the original text {count} is {len(text)} and their ratio is {round(len(new_text)/len(text),2)}')
-            # print()##add some space
             ##Lexical analyser and symmbol table creation per sentence
             for sentence in sentences:
-              tokens = self.word_token.tokenize(sentence)
+              sentence = re.sub(",", ' ', sentence)
+              sentence = re.sub("[0-9]+\s*.[0-9]+\s*.[0]+", self.dashrepl, sentence)
+              sentence = re.sub(r"http\S+", "", sentence)
+              sentence = re.sub("[A-Za-z0-9]*@[A-Za-z0-9]*.[A-Za-z]*", '', sentence)
+              tokens = word_tokenize(sentence, language='french')
+              tokens = [re.sub("[a-z]+[',’,']",'', token) for token in tokens] 
               tokens = [token for token in tokens if token != '\n'] ##Regular expression could also solve the problem
-              tokens = [token for token in tokens if token.isalpha()] ##Removing numerical data
+              tokens = [token for token in tokens if token not in ['*','.',',','«','(',')','»',"l'",'-',';','[',']','—',':','…','?','–','...','!','’',"'",'•','/','➢','&','|','=']] 
+              tokens = [re.sub("[.,•]",'', token) for token in tokens]
+              
               if '\n ' in tokens:
                   tokens.remove('\n ') ##Remove empty space symbols
               if len(tokens) != 0:
@@ -142,6 +125,7 @@ class preprocess:
           print('Your data shoud be found inside a list')
         
         return self.sentence_token
+
 
 class recognition:
 
@@ -167,6 +151,7 @@ class recognition:
       else:
         result = []
         not_found = []
+        count = 1
         self.model = Word2Vec.load(path_model)
         for sentence in sentence_list:
             for word in sentence:
@@ -182,14 +167,15 @@ class recognition:
                       result.append((word,cos_sim_avg))
             print()
             result = sorted(result, key = lambda x:x[1], reverse = True)[:1]
+            result = sorted(result, key = lambda x:x[2], reverse = False)[:1]
             if len(result) !=0:
-              print('Complex word(s) found')
+              print(f'Complex word(s) found in sentence {count}')
               self.token_to_complex.append([' '.join(sentence),result[0][0]])
               
             else:
-              print('No complex word found')
+              print(f'No complex word(s) found in sentence {count}')
               self.token_to_complex.append([' '.join(sentence)])
-
+            count+=1
       return self.token_to_complex  
 
 
