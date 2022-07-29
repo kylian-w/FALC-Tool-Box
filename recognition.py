@@ -23,6 +23,7 @@ from nltk.tokenize import TreebankWordTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from numpy.linalg import svd
 from gensim.models import Word2Vec
+import pickle
 
 
 
@@ -35,7 +36,6 @@ class preprocess:
   """
   def __init__(self):
       self.sentence_token = list()
-      self.texts= list()
       self.total_token = 0
 
   def extract_text_pdf(self,pdf_directory):
@@ -44,19 +44,18 @@ class preprocess:
       processed list of the text.
 
       input: pdf direcotry
-      output: list of preprocessed text that is tokenized sentences and their tokens
+      output: list of preprocessed text
       """
-      pdf_clean_text = list()
       pdf =  open(pdf_directory,'rb')
       pdf = PyPDF2.PdfFileReader(pdf)
-      texts= list()
       for i in range(pdf.numPages):
+        print(i)
         pagepdf = pdf.getPage(i)
-        self.texts.append(self.lower_text(pagepdf.extractText()))
-      
+        _ , total = self.preprocess_text([self.lower_text(pagepdf.extractText())])
+        self.total_token+=total
       print(f'In document {pdf_directory} a total of {pdf.numPages} page(s) was identified in the PDF and  {self.total_token} token(s) processed.')
       print()
-      return self.preprocess_text(self.texts)
+      return self.sentence_token
 
   def lower_text(self,text):
       """
@@ -106,11 +105,12 @@ class preprocess:
       splitted sentence from text using spacy part of speech
       french tagging.
 
-      input: text corpus
+      input: list of sentence tokens
       output: list of tokens associated to each sentence
       """
-      if type(texts) == str: ## Make sure text is found in a list
-        print('ProcessError: Your input value should be in a form of a list try again')
+      total = 0
+      if type(texts) == str:
+        print('ProcessErrro: Your input value should be in a form of a list try again')
       
       else: 
         try:
@@ -119,27 +119,28 @@ class preprocess:
             sentences = self.clean_text(text) ##Parser
             ##Lexical analyser and symmbol table creation per sentence
             for sentence in sentences:
-              sentence = re.sub(",", ' ', sentence) ## replace special character by empty space
-              sentence = re.sub("[0-9]+\s*.[0-9]+\s*.[0]+", self.bind_num, sentence) ##Capture french numerical numbers
-              sentence = re.sub(r"http\S+", "", sentence) ## Replace http links by empty space
-              sentence = re.sub("[A-Za-z0-9]*@[A-Za-z0-9]*.[A-Za-z]*", '', sentence) ## Replace email addresses by empty space
+              sentence = re.sub(",", ' ', sentence)
+              sentence = re.sub("[0-9]+\s*.[0-9]+\s*.[0]+", self.dashrepl, sentence)
+              sentence = re.sub(r"http\S+", "", sentence)
+              sentence = re.sub("[A-Za-z0-9]*@[A-Za-z0-9]*.[A-Za-z]*", '', sentence)
               tokens = word_tokenize(sentence, language='french')
-              tokens = [re.sub("[a-z]+[',’,']",'', token) for token in tokens] #
-              tokens = [token for token in tokens if token != '\n'] ## Remove next line (\n) symbols
-              tokens = [token for token in tokens if token not in ['*','.',',','«','(',')','»',"l'",'-',';','[',']','—',':','…','?','–','...','!','’',"'",'•','/','➢','&','|','=']] ## remove special characters 
-              tokens = [re.sub("[.,•]",'', token) for token in tokens] ## replace special characters by empty space
-              self.total_token += len(tokens)
-
+              tokens = [re.sub("[a-z]+[',’,']",'', token) for token in tokens] 
+              tokens = [token for token in tokens if token != '\n'] ##Regular expression could also solve the problem
+              tokens = [token for token in tokens if token not in ['*','.',',','«','(',')','»',"l'",'-',';','[',']','—',':','…','?','–','...','!','’',"'",'•','/','➢','&','|','=']] 
+              tokens = [re.sub("[.,•]",'', token) for token in tokens]
+              
+              
               if '\n ' in tokens:
                   tokens.remove('\n ') ##Remove empty space symbols
               if len(tokens) != 0:
                 self.sentence_token.append(tokens)
+                total += len(tokens)
             count+=1 ##Count the number of available text
+            print(f'The total number of {total} token(s) has been processed')
         except TypeError:
           print('Your data shoud be found inside a list')
         
-        return self.sentence_token
-
+        return self.sentence_token, total
 
 class recognition:
 
@@ -148,11 +149,41 @@ class recognition:
       self.token_to_complex = list()
       self.sentence_verbs = list()
       self.model = 0
-      # self.lexique = pd.read_table('http://www.lexique.org/databases/Lexique383/Lexique383.tsv')
-      # self.lexique = self.lexique.groupby('ortho').sum()
+      self.complex_words = 0
+      self.lexique = pd.read_table('http://www.lexique.org/databases/Lexique383/Lexique383.tsv')
+      self.lexique = self.lexique.groupby('ortho').sum()
+      self.pca = PCA(n_components=1)
 
 
-   def complex_word_recognition(self,sentence_list,path_model,margin=0.10):
+   def classifier1(self,model_path,tokens):
+
+            token_features = self.lexique[self.lexique.index.isin(tokens)]
+            token_features_num = token_features.select_dtypes(['int64','float64'])
+            token_features_num = token_features_num.replace(-np.inf,0)
+            input = self.pca.fit_transform(token_features_num)    
+            # _sc = StandardScaler()
+            # _pca = PCA(n_components = 1)
+            # preprocess = Pipeline([
+            #     ('std_scaler', _sc),
+            #     ('pca', _pca),
+            #     ('regressor', _model)
+            # ])
+            #          
+            ##feature creation for model prediction
+            ##load the model from disk
+            filename = self.model ##path to machine learning model
+            loaded_model = pickle.load(open(model_path, 'rb'))
+            result = loaded_model.predict(input)
+
+            ##Getting the list of complex words in the tokenized sentence
+            token_features['class'] = result
+            token_features['class'] = token_features['class'].replace(to_replace=[1,0], value=['simple', 'complex'])
+            self.complex_words = token_features[token_features['class'] == 'complex'].index.to_list()
+
+            return self.complex_words
+
+
+   def complex_word_recognition(self,sentence_list,classifier1,word2vec,truth=''):
       """
       This function permits the extraction of complex words in 
       a sentence with the use of a classification model.
@@ -160,37 +191,38 @@ class recognition:
       input: tokenized set of sentences
       output: tokenized sentences with their associated complex words
       """
+      self.token_to_complex = list()
+      final = []
+      result = []
       if type(sentence_list[0]) == str:
         print('TypeError:Your input value should be in a form of a list try again') ##Check data validity
       else:
-        result = []
+
         not_found = []
-        count = 1
-        self.model = Word2Vec.load(path_model)
-        for sentence in sentence_list:
-            for word in sentence:
+
+        self.model = Word2Vec.load(word2vec) ## load word2vec model
+
+        for sentence in sentence_list: ## Get each sentence in the sentence list
+            for word in sentence: ## Get each word in each sentence
                 if word not in self.model.wv.index_to_key:
-                  not_found.append(word)
+                  not_found.append(word) ## If sentence not found in vocabulary update rhe vocabulary
             if len(not_found) !=0:
               self.model.build_vocab([not_found], update=True)
-              self.model.train([not_found],total_examples=self.model.corpus_count, epochs=self.model.epochs)
-            for word in sentence:
-                  cos_sim_avg = np.average(self.model.wv.cosine_similarities(self.model.wv[word],self.model.wv[self.model.wv.index_to_key]))
+              self.model.train([not_found],total_examples=self.model.corpus_count, epochs=self.model.epochs) #Then retrain the model
+            
+            complex_words = self.classifier1(classifier1,sentence)
+            self.complex_words.remove(self.model.wv.doesnt_match(complex_words)) 
+            comlex_word_features  = self.get_features(self.complex_words,word2vec)
+            for word in self.complex_words:
+                  cos_sim_avg = np.average(self.model.wv.cosine_similarities(self.model.wv[word],self.model.wv[sentence])) \
+                  * self.lexique[self.lexique.index.isin([word])]['freqfilms2'].values ## Compute cosine similarity of each word with words in the vocabulary giving a specific value to differentiate betwwen complex and simple words.
+                  
+                  if cos_sim_avg < 1:
+                    print(word, cos_sim_avg,self.lexique[self.lexique.index.isin([word])]['freqfilms2'].values)
+                    final.append(word)
+        result.append([' '.join(sentence),self.complex_words])
 
-                  if cos_sim_avg > margin:
-                      result.append((word,cos_sim_avg))
-            print()
-            result = sorted(result, key = lambda x:x[1], reverse = True)[:1]
-            result = sorted(result, key = lambda x:x[2], reverse = False)[:1]
-            if len(result) !=0:
-              print(f'Complex word(s) found in sentence {count}')
-              self.token_to_complex.append([' '.join(sentence),result[0][0]])
-              
-            else:
-              print(f'No complex word(s) found in sentence {count}')
-              self.token_to_complex.append([' '.join(sentence)])
-            count+=1
-      return self.token_to_complex  
+      return  result
 
 
    def tense_recognition(self):
