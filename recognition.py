@@ -212,7 +212,6 @@ class recognition:
             
             complex_words = self.classifier1(classifier1,sentence)
             self.complex_words.remove(self.model.wv.doesnt_match(complex_words)) 
-            comlex_word_features  = self.get_features(self.complex_words,word2vec)
             for word in self.complex_words:
                   cos_sim_avg = np.average(self.model.wv.cosine_similarities(self.model.wv[word],self.model.wv[sentence])) \
                   * self.lexique[self.lexique.index.isin([word])]['freqfilms2'].values ## Compute cosine similarity of each word with words in the vocabulary giving a specific value to differentiate betwwen complex and simple words.
