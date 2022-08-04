@@ -14,8 +14,12 @@ class synonyms:
                 synonyms = set()
                 if len(word.split(' ')) == 1:
                     for senses in tag.find_all('Sense'):
-                        sense = senses.find('feat',{'att':'poids'})['val']
-                        usage = senses.find('feat',{'att':'usage'})['val']
+                        if senses.find('feat',{'att':'poids'}) is not None:
+                          sense = senses.find('feat',{'att':'poids'})['val']
+                          usage = senses.find('feat',{'att':'usage'})['val']
+                        else:
+                          sense = '0'
+                          usage = ''
                         if float(sense) > 0.99:
                             for synonym in senses.find_all('SenseExample'):
                                 synonym_ = synonym.find('feat',{'att':'word'})['val']
