@@ -2,6 +2,9 @@
 
 ##TODO: just keep what is needed in the imports
 import PyPDF2
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import pipeline
+from french_lefff_lemmatizer.french_lefff_lemmatizer import FrenchLefffLemmatizer
 import re
 import pandas as pd
 import numpy as np
@@ -146,6 +149,11 @@ class recognition:
       self.sentence_verbs = list()
       self.model = 0
       self.complex_words = 0
+      self.lemmatizer = FrenchLefffLemmatizer()
+      ##Part of speech tagging pretrained model
+      tokenizer = AutoTokenizer.from_pretrained("gilf/french-postag-model")
+      model = AutoModelForTokenClassification.from_pretrained("gilf/french-postag-model")
+      self.nlp_token_class = pipeline('ner', model=model, tokenizer=tokenizer, grouped_entities=True)
       self.lexique = pd.read_table('http://www.lexique.org/databases/Lexique383/Lexique383.tsv')
       self.lexique = self.lexique.groupby('ortho').sum() ##Grouping words to remove the obstacle of grammatical category
       self.pca = PCA(n_components=1)
@@ -197,9 +205,14 @@ class recognition:
       input: tokenized set of sentences
       output: tokenized sentences with their associated complex words
       """
+      #TODO: Fix the problem of RuntimeWarning: invalid value encountered in true_divide explained_variance_ = (S ** 2) / (n_samples - 1)
+      #TODO: Fix the problem UserWarning: `grouped_entities` is deprecated and will be removed in version v5.0.0, defaulted to `aggregation_strategy="simple"` instead.grouped_entities` is deprecated and will be removed in version v5.0.0, defaulted to"
+      #TODO: Update perfarmances by playing with validation test1 and test2 and also if possible play with another POS tagging model
       self.token_to_complex = list()
       final = []
       result = []
+      lemme = ''
+      complex_word_pos_dict = {}
       if type(sentence_list[0]) == str:
         print('TypeError:Your input value should be in a form of a list try again') ##Check data validity
       else:
@@ -224,10 +237,89 @@ class recognition:
                   
                   if cos_sim_avg < 1:
                     final.append(word)
-            result.append([' '.join(sentence),final])
-            final = []
+            
+            ###obtaining the tag of the complex word
+            for item in self.nlp_token_class(' '.join(sentence)):
+              for complex_word in final:
+                if item['word'] == complex_word:
+                  print(' '.join(sentence))
+                  print('found similar word', item['word'])
+                  print('the grammtical cat of word: ', item['entity_group'])
+                  print('Lemma: ',self.lemmatizer.lemmatize(complex_word,'all'))
+                  print('length: ', len(self.lemmatizer.lemmatize(complex_word,'all')))
+                  if len(self.lemmatizer.lemmatize(complex_word,'all')) > 0:
+                    if item['entity_group'] == 'V' or  item['entity_group'] == 'VIMP' or item['entity_group'] == 'VINF'or item['entity_group'] == 'VPP'or item['entity_group']=='VPR':
+                      print('found word entity like verbe', item['word'])
+                      for i in self.lemmatizer.lemmatize(complex_word,'all'):
+                          print('check: ',i[1])
+                          if i[1] == 'v':
+                            lemme = i[0]                    
+                            complex_word_pos_dict[complex_word] = [lemme,'VER']
+                            print('found entity', item['entity_group'] )
+                            print()
 
-      return  result
+                    elif item['entity_group'] == 'NPP' or item['entity_group'] == 'NC':
+                      print('found word entity like nom', item['word'])
+                      for i in self.lemmatizer.lemmatize(complex_word,'all'):
+                            print('check: ',i[1])
+                            if i[1] == 'nc':
+                              lemme = i[0]
+                              complex_word_pos_dict[complex_word] = [lemme,'NC']
+                              print('found entity', item['entity_group'] )
+                              print()
+
+                    elif item['entity_group'] ==  'ADJWH' or item['entity_group'] ==  'ADJ':
+                      print('found word entity like adjective', item['word'])                 
+                      for i in self.lemmatizer.lemmatize(complex_word,'all'):
+                            print('check: ',i[1])
+                            if i[1] == 'adj':
+                              lemme = i[0]
+                              complex_word_pos_dict[complex_word] = [lemme,'ADJ']
+                              print('found entity', item['entity_group'] )
+                              print()
+
+                    elif item['entity_group'] ==  'ADVWH' or item['entity_group'] ==  'ADV':
+                      print('found word entity like adverb', item['word'])
+                      print('Lemma: ',self.lemmatizer.lemmatize(complex_word,'all'))
+                      for i in self.lemmatizer.lemmatize(complex_word,'all'):
+                            print('check: ',i[1])
+                            if i[1] == 'adv':
+                              lemme = i[0]
+                              complex_word_pos_dict[complex_word] = [lemme,'ADV']
+                              print('found entity', item['entity_group'] )
+                              print()
+
+                    else:
+                      if item['entity_group'] == 'U' or item['entity_group'] == 'CS':
+                        print('word validaity test 2')
+                        print('Deleted a bad complex word: ', complex_word)
+                        final.remove(complex_word)
+                        print('confirm deletion....', complex_word)
+                      # else:
+                      #   print('Lemma: ',self.lemmatizer.lemmatize(complex_word,'all'))
+                      #   print(item['entity_group'])
+                      #   print(complex_word)
+                      #   for i in self.lemmatizer.lemmatize(complex_word,'all'):
+                      #           print('check: ',i[1])
+                      #           lemme = i[0]                      
+                      #           complex_word_pos_dict[complex_word] = [lemme,item['entity_group']]
+                      #           print('I did the else case')
+                      #           print()
+                  
+                  else:
+                      print('word validaity test 1')
+                      print('Deleted a bad complex word: ',complex_word)
+                      final.remove(complex_word)
+                      print('confirm deletion....', complex_word)
+                      print()
+
+            result.append([' '.join(sentence),complex_word_pos_dict])
+
+            ##Updated storage
+            final = []
+            complex_word_pos_dict = {}
+
+      return  result, 
 
 
    def tense_recognition(self):
