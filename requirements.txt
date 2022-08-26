@@ -10,3 +10,4 @@ PyDictionary
 nltk
 condacolab
 faiss
+stanza

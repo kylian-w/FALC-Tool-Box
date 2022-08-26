@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-##TODO: just keep what is needed in the imports
 import PyPDF2
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import pipeline
@@ -11,14 +10,13 @@ import numpy as np
 from sklearn.decomposition import PCA
 import nltk
 nltk.download('punkt')
-from nltk.tokenize import word_tokenize
-from nltk.tokenize import sent_tokenize
+from nltk.tokenize import word_tokenize, sent_tokenize
 from gensim.models import Word2Vec
+from gensim.models.fasttext import FastText
 import pickle
-
-
-##TODO: Add descriptions to all functions approriately
-
+import time
+import datetime
+import stanza
 
 
 class preprocess:
@@ -95,6 +93,99 @@ class preprocess:
       """
       return ''.join(matchobj.group(0).split(' '))
 
+  def train_corpus(self,corpus,save_directory,word2vec=False):
+    """
+    Trains pretrain language model either word2vec or fastext.
+    The best models simple to implement pretrained models.
+
+    input:
+      corpus: set of tokenized words in sentence.
+      save_directory: directory where the model will be saved.
+      word2vec: boolean to determine whether to run the word2vec or fasttext model.
+
+    output: None
+    """
+    if word2vec:
+      start = time.time()
+      model = Word2Vec(vector_size=100, window=5, min_count=1)
+      model.build_vocab(corpus)
+      model.train(corpus,total_examples=model.corpus_count, epochs=model.epochs)
+      model.save(f'{save_directory}/word2vec{datetime.now()}.model')
+      end = time.time()
+      print(f'The model compeleted training in {end-start} seconds')
+    else:
+      model = FastText(vector_size=100, min_count=1)
+      model.build_vocab(corpus_file=corpus)
+      model.train(
+          corpus_file=corpus, epochs=model.epochs, total_examples=model.corpus_count, total_words=model.corpus_total_words)
+      model.save(f'{save_directory}/fasttext{datetime.now()}.model')
+
+  def min_edit_distance(source, target, ins_cost = 1, del_cost = 1, rep_cost = 2):
+      '''
+      Input: 
+          source: a string corresponding to the string you are starting with
+          target: a string corresponding to the string you want to end with
+          ins_cost: an integer setting the insert cost
+          del_cost: an integer setting the delete cost
+          rep_cost: an integer setting the replace cost
+      Output:
+          D: a matrix of len(source)+1 by len(target)+1 containing minimum edit distances
+          med: the minimum edit distance (med) required to convert the source string to the target
+      '''
+      # use deletion and insert cost as  1
+      m = len(source) 
+      n = len(target) 
+      #initialize cost matrix with zeros and dimensions (m+1,n+1) 
+      D = np.zeros((m+1, n+1), dtype=int) 
+      for row in range(0,m): # Replace None with the proper range
+          D[row,0] = 0
+      for col in range(0,n): # Replace None with the proper range
+          D[0,col] = 0        
+      for row in range(1,m):      
+          for col in range(1,n):           
+              r_cost = 0
+              if None: # Replace None with a proper comparison
+                  # Update the replacement cost to 0 if source and target are the same
+                  r_cost = None                
+              # Update the cost at row, col based on previous entries in the cost matrix
+              # Refer to the equation calculate for D[i,j] (the minimum of three calculated costs)
+              D[row,col] = None
+              
+      # Set the minimum edit distance with the cost found at row m, column n 
+      med = None
+      return D, med
+
+  def MED(sent_01, sent_02):
+      #TODO: Learn how to implement the minimum edit score from by yourself
+      """
+      Minimum edit distance for two sentence
+      Note: Later go back and learn about it Or you can even implement it late
+
+      input:
+        - sentence 1
+        - sentence 2
+      
+      output: minum edit score to move from sentence 1 to 2
+      """
+      n = len(sent_01)
+      m = len(sent_02)
+
+      matrix = [[i+j for j in range(m+1)] for i in range(n+1)]
+
+      for i in range(1, n+1):
+          for j in range(1, m+1):
+              if sent_01[i-1] == sent_02[j-1]:
+                  d = 0
+              else:
+                  d = 1
+
+              matrix[i][j] = min(matrix[i-1][j]+1, matrix[i][j-1]+1, matrix[i-1][j-1]+d)
+              print(matrix[i][j])
+
+      distance_score = matrix[n][m]
+    
+      return distance_score
+
   def preprocess_text(self,texts):
       """
       This function entails further preprocessing operations
@@ -109,7 +200,8 @@ class preprocess:
 
       total = 0
       if type(texts) == str:
-        print('ProcessErrror: Your input value should be in a form of a list try again')
+        print()
+        print('ProcessErrror: Your text should be in a list !!!!')
       
       else: 
         try:
@@ -127,24 +219,26 @@ class preprocess:
               tokens = [token for token in tokens if token != '\n'] ##Regular expression could also solve the problem
               tokens = [token for token in tokens if token not in ['*','.',',','«','(',')','»',"l'",'-',';','[',']','—',':','…','?','–','...','!','’',"'",'•','/','➢','&','|','=']] 
               tokens = [re.sub("[.,•]",'', token) for token in tokens]
-              
-              
+
               if '\n ' in tokens:
                   tokens.remove('\n ') ##Remove empty space symbols
               if len(tokens) != 0:
                 self.sentence_token.append(tokens)
                 total += len(tokens)
             count+=1 ##Count the number of available text
-            print(f'The total number of {total} token(s) has been processed')
+            print()
+            print(f'A total number of {total} token(s) has been processed')
         except TypeError:
-          print('Your data shoud be found inside a list')
+          print()
+          print('You used an innapproriate type of data')
         
         return self.sentence_token, total
 
 class recognition:
 
    def __init__(self):
-
+      stanza.download('fr') 
+      self.nlp = stanza.Pipeline(lang='fr', processors='tokenize,mwt,pos,lemma,depparse') ##Treebank parser
       self.token_to_complex = list()
       self.sentence_verbs = list()
       self.model = 0
@@ -157,7 +251,6 @@ class recognition:
       self.lexique = pd.read_table('http://www.lexique.org/databases/Lexique383/Lexique383.tsv')
       self.lexique = self.lexique.groupby('ortho').sum() ##Grouping words to remove the obstacle of grammatical category
       self.pca = PCA(n_components=1)
-
 
    def classifier1(self,model_path,tokens):
             """
@@ -197,7 +290,7 @@ class recognition:
             return self.complex_words
 
 
-   def complex_word_recognition(self,sentence_list,classifier1,model,truth=''):
+   def complex_word_recognition(self,sentence_list,classifier1,model,word2vec=True):
       """
       This function permits the extraction of complex words in 
       a sentence with the use of a classification model.
@@ -219,7 +312,10 @@ class recognition:
 
         not_found = []
 
-        self.model = Word2Vec.load(model) ## load word2vec model
+        if word2vec:
+          self.model = Word2Vec.load(model) ## load word2vec model
+        else:
+          self.model = FastText.load(model)
 
         for sentence in sentence_list: ## Get each sentence in the sentence list
             for word in sentence: ## Get each word in each sentence
@@ -242,59 +338,34 @@ class recognition:
             for item in self.nlp_token_class(' '.join(sentence)):
               for complex_word in final:
                 if item['word'] == complex_word:
-                  print(' '.join(sentence))
-                  print('found similar word', item['word'])
-                  print('the grammtical cat of word: ', item['entity_group'])
-                  print('Lemma: ',self.lemmatizer.lemmatize(complex_word,'all'))
-                  print('length: ', len(self.lemmatizer.lemmatize(complex_word,'all')))
                   if len(self.lemmatizer.lemmatize(complex_word,'all')) > 0:
                     if item['entity_group'] == 'V' or  item['entity_group'] == 'VIMP' or item['entity_group'] == 'VINF'or item['entity_group'] == 'VPP'or item['entity_group']=='VPR':
-                      print('found word entity like verbe', item['word'])
                       for i in self.lemmatizer.lemmatize(complex_word,'all'):
-                          print('check: ',i[1])
                           if i[1] == 'v':
                             lemme = i[0]                    
                             complex_word_pos_dict[complex_word] = [lemme,'VER']
-                            print('found entity', item['entity_group'] )
-                            print()
 
                     elif item['entity_group'] == 'NPP' or item['entity_group'] == 'NC':
-                      print('found word entity like nom', item['word'])
                       for i in self.lemmatizer.lemmatize(complex_word,'all'):
-                            print('check: ',i[1])
                             if i[1] == 'nc':
                               lemme = i[0]
                               complex_word_pos_dict[complex_word] = [lemme,'NC']
-                              print('found entity', item['entity_group'] )
-                              print()
 
-                    elif item['entity_group'] ==  'ADJWH' or item['entity_group'] ==  'ADJ':
-                      print('found word entity like adjective', item['word'])                 
+                    elif item['entity_group'] ==  'ADJWH' or item['entity_group'] ==  'ADJ':               
                       for i in self.lemmatizer.lemmatize(complex_word,'all'):
-                            print('check: ',i[1])
                             if i[1] == 'adj':
                               lemme = i[0]
                               complex_word_pos_dict[complex_word] = [lemme,'ADJ']
-                              print('found entity', item['entity_group'] )
-                              print()
 
                     elif item['entity_group'] ==  'ADVWH' or item['entity_group'] ==  'ADV':
-                      print('found word entity like adverb', item['word'])
-                      print('Lemma: ',self.lemmatizer.lemmatize(complex_word,'all'))
                       for i in self.lemmatizer.lemmatize(complex_word,'all'):
-                            print('check: ',i[1])
                             if i[1] == 'adv':
                               lemme = i[0]
                               complex_word_pos_dict[complex_word] = [lemme,'ADV']
-                              print('found entity', item['entity_group'] )
-                              print()
 
                     else:
                       if item['entity_group'] == 'U' or item['entity_group'] == 'CS':
-                        print('word validaity test 2')
-                        print('Deleted a bad complex word: ', complex_word)
                         final.remove(complex_word)
-                        print('confirm deletion....', complex_word)
                       # else:
                       #   print('Lemma: ',self.lemmatizer.lemmatize(complex_word,'all'))
                       #   print(item['entity_group'])
@@ -307,47 +378,46 @@ class recognition:
                       #           print()
                   
                   else:
-                      print('word validaity test 1')
-                      print('Deleted a bad complex word: ',complex_word)
                       final.remove(complex_word)
-                      print('confirm deletion....', complex_word)
-                      print()
 
             result.append([' '.join(sentence),complex_word_pos_dict])
 
             ##Updated storage
             final = []
             complex_word_pos_dict = {}
+      print()
+      print('Done processsing !!')
+      return  result
 
-      return  result, 
 
+   def tense_recognition(self,words_sentence):
+      """
+      Gathers the verbs in a sentence and their associated
+      genre, person number and position in text.
 
-   def tense_recognition(self):
-      count = 1
-      for tokens in self.tokenized_sentences: 
-        ##Parse tokens
-        doc = self.nlp(' '.join(tokens))
-        sent = list(doc.sents)[0]
-        ##Visualize parsing
-        print(sent._.parse_string)
+      input:
+        - sentences: list of sentences
+      
+      output: 
+        - sentence_verb_tense: list of sentences with their associated verbs,
+          genre, person number and position in text.
+      """
+      sentence_verb_tense = []
+      for sentence in words_sentence:       
+        post,tense,person = '','',''
+        verb_tense = []
+        doc = self.nlp(' '.join(sentence))
+        for word  in doc.sentences[0].words:
+            if word.upos =='VERB':
+              if word.feats is not None:
+                  if len(word.feats.split('|')) > 1:      
+                    for content in word.feats.split('|'):
+                      if 'Tense' in content:
+                        tense = content.split('=')[1]
+                      elif 'Person' in  content:
+                          person = content.split('=')[1] 
+                    post = word.feats.split('|')[1].split('=')[1] 
+                  verb_tense.append((word.id,word.text,post,person,tense))
+        sentence_verb_tense.append([' '.join(sentence), verb_tense])
+      return sentence_verb_tense
 
-        #Extract verbs in text
-        verbs = list()
-        exp = re.compile('[(V]* ') ##Regular expression to extract all verbs
-        for i in range(0,len(tokens)):
-          word = list(doc.sents)[0][i]
-          print('word',word)
-          if len(list(doc.sents)[0][i]._.labels)!=0:
-            if 'VN' in list(doc.sents)[0][i]._.labels and 'VINF' not in list(doc.sents)[0][i]._.parse_string:
-              verbs.append(word)
-          elif exp.match(list(doc.sents)[0][i]._.parse_string):
-            verbs.append(word)
-
-        ##get the word lemme and its tense value
-        view = self.lexique[(self.lexique['ortho'].isin([str(i) for i in verbs])) & (self.lexique['cgram'] == 'VER')]
-
-        ##Create output in the form of a list
-        for i in range(0,len(view.ortho.values)):
-          self.sentence_verbs.append({'sentence_tokens':tokens,'verb':view.ortho.values[i], 'lemme':view.lemme.values[i], 'tense':view.infover.values[i]})
-        print(f'Completed sentence {count} and stored')
-        print()##add some space
