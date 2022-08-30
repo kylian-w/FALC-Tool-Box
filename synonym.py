@@ -12,8 +12,6 @@ class resyf:
         """
         one_sense_synonym_words = []
         senses_synonym_words = []
-        sense_scores = []
-        state_senses = False
         with open(xml_file, 'r') as f:
             data = f.read()
             Bs_data = BeautifulSoup(data, "xml")
@@ -23,28 +21,22 @@ class resyf:
                 if len(word.split(' ')) == 1: ##Working with unigrams
                     for senses in tag.find_all('Sense'):
                         if senses.find('feat',{'att':'poids'}) is not None:
-                            state_senses = True ## keep track of whether word has several senses or not for further operation
                             sense = senses.find('feat',{'att':'poids'})['val']
-                            sense_scores.append((senses,float(sense))) ## store all word senses
-                        elif state_senses:
-                            sense_scores = sorted(sense_scores, key = lambda x:x[1], reverse = True)
-                            # if float(sense) == 1.0: 
-                            senses_synonym_words = [] ##managing synonyms with several senses
-                            for senses[0] in sense_scores[:1]: ## produce synonyms for word with the highest sense, sometimes the sense will not be always 1 the why this is implmented.
+                            if float(sense) == 1.0:
+                                senses_synonym_words = [] ##managing synonyms with several senses
                                 for synonym in senses.find_all('SenseExample'):
                                     synonym_ = synonym.find('feat',{'att':'word'})['val']
                                     rank = synonym.find('feat',{'att':'rank'})['val']  
-                                    usage = senses[0].find('feat',{'att':'usage'})['val']
+                                    usage = senses.find('feat',{'att':'usage'})['val']
                                     senses_synonym_words.append((synonym_,int(rank)))                            
-                                self.sort_store_synonyms(word,senses_synonym_words,postag,usage,state=True) # sorting and storing the synonym in dictionary     
+                                self.sort_store_synonyms(word,senses_synonym_words,postag,usage,state=True)     
                         else:
-                            state_senses =  False ## tracking state of whether the word has several senses or not.
                             one_sense_synonym_words = [] ##managing one sense synonyms
                             for synonym in senses.find_all('SenseExample'):
                                 synonym_ = synonym.find('feat',{'att':'word'})['val']
                                 rank = synonym.find('feat',{'att':'rank'})['val'] 
                                 one_sense_synonym_words.append((synonym_, int(rank)))
-                            self.sort_store_synonyms(word,one_sense_synonym_words,postag) # sorting ans storing the synonyms in dictionary.
+                            self.sort_store_synonyms(word,one_sense_synonym_words,postag)
 
             print('Done loading the ontology.')
 
@@ -63,7 +55,7 @@ class resyf:
         """
 
         synonym_list = []
-        sorted_synonyms = sorted(synonyms, key = lambda x:x[1], reverse = False) ## sorting list of ascending order of synonyms with asssociated rank with synonym
+        sorted_synonyms = sorted(synonyms, key = lambda x:x[1], reverse = False) ## sorting list of synonyms with asssociated rank with synonym
         for values in sorted_synonyms:
             synonym_list.append(values[0]) ## extracting the words from the list for further filtering within the list.
         index = synonym_list.index(word)
@@ -101,7 +93,7 @@ class resyf:
         Gets the synonyms of several words at a time
 
         input: 
-            - words: list of key values of words
+            - list of key values of words
 
         output: list of words and their associated synonyms
         """
@@ -114,11 +106,8 @@ class resyf:
                 else:
                     word_synonyms.append(self.get_synonym(record[1][0].lower(),record[1][1].upper()))
             return word_synonyms
-        except IndexError:
-            print('Your input data should be in the format (word,[lemma, part of speech])')     
-
-        except KeyError:
-            print('Your input data should be in the format (word,[lemma, part of speech])')   
+        except TypeError:
+            print('Your input data should be in the format [word,[(synonym, rank)]]')
                 
             
                 
