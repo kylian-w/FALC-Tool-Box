@@ -1,5 +1,5 @@
 import re
-def sub_pipepline(inp):
+def sub_pipepline(inp,camembert,resf):
       # def __init__(self,output):
   #   self.output=output
   
